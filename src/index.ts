@@ -1,3 +1,3 @@
-import { Add } from './Add.js';
+import { Registrar } from './Registrar.js';
 
-export { Add };
+export { Registrar };
