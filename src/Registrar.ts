@@ -12,27 +12,27 @@ import {
 export class Registrar extends SmartContract {
   deploy(args: DeployArgs) {
     super.deploy(args);
+  }
+
+  init() {
+    super.init();
     this.setPermissions({
       ...Permissions.default(),
       setTokenSymbol: Permissions.signature(),
       send: Permissions.proof(),
       receive: Permissions.proof(),
     });
-  }
-
-  init() {
-    super.init();
-    this.requireSignature();
     this.tokenSymbol.set('VOTER');
+    //this.requireSignature();
   }
 
   getTokenID() {
-    return this.tokenId;
+    return this.token.id;
   }
 
   //TODO temporarily accepting voterPriavetKey - better solution should be signature from sender
   @method RegisterToVote(voter: PublicKey, voterSecret: PrivateKey) {
-    Account(voter, this.tokenId).isNew.assertEquals(Bool(true));
+    Account(voter, this.token.id).isNew.assertEquals(Bool(true));
     voterSecret.toPublicKey().assertEquals(voter);
     this.token.mint({
       address: voter,

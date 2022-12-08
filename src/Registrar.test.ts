@@ -1,5 +1,6 @@
 import { Registrar } from './Registrar';
 import {
+  Account,
   AccountUpdate,
   isReady,
   Mina,
@@ -7,7 +8,6 @@ import {
   PublicKey,
   shutdown,
 } from 'snarkyjs';
-import { TokenId } from 'snarkyjs/dist/node/provable/transaction-leaves-json';
 
 const proofsEnabled = false;
 
@@ -19,18 +19,19 @@ describe('RegisterToVote', () => {
     voter1: PublicKey,
     voter2: PublicKey,
     voter1Secret: PrivateKey,
-    voter2Secret: PrivateKey,
-    tokenId: TokenId;
+    voter2Secret: PrivateKey;
 
   beforeAll(async () => {
     await isReady;
-    console.log('Starting local blockchain');
+    console.time('Starting local blockchain');
     const Local = Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
+    console.timeLog('Starting local blockchain');
     deployerAccount = Local.testAccounts[0].privateKey;
     if (proofsEnabled) {
-      console.log('Compiling contract');
+      console.time('Compiling contract');
       await Registrar.compile();
+      console.timeLog('Compiling contract');
     }
 
     zkAppPrivateKey = PrivateKey.random();
@@ -42,17 +43,19 @@ describe('RegisterToVote', () => {
     voter1 = voter1Secret.toPublicKey();
     voter2 = voter2Secret.toPublicKey();
 
-    console.log('deploying contract');
+    console.time('deploying contract');
     const registrar = new Registrar(zkAppAddress);
     const deploy_txn = await Local.transaction(deployerAccount, () => {
       AccountUpdate.fundNewAccount(deployerAccount);
       registrar.deploy({ zkappKey: zkAppPrivateKey });
     });
+    console.time('proving transaction');
     await deploy_txn.prove();
+    console.timeLog('proving transaction');
+    console.time('signing and sending transaction');
     await deploy_txn.sign([zkAppPrivateKey]).send();
-    console.log(deploy_txn.toPretty());
-    tokenId = zkApp.getTokenID().toString();
-    console.log('TokenId: ', tokenId);
+    console.timeLog('signing and sending transaction');
+    console.timeLog('deploying contract');
     console.log('Ready to test');
   });
 
@@ -64,20 +67,36 @@ describe('RegisterToVote', () => {
   });
 
   it('attempts to mint token for publickey', async () => {
+    console.time('RegisterToVote');
     const txn = await Mina.transaction(deployerAccount, () => {
-      AccountUpdate.fundNewAccount(deployerAccount);
-      AccountUpdate.fundNewAccount(deployerAccount);
+      if (Account(voter1).isNew.get()) {
+        AccountUpdate.fundNewAccount(deployerAccount);
+        //AccountUpdate.fundNewAccount(deployerAccount);
+        //AccountUpdate.fundNewAccount(deployerAccount);
+        console.log('funding 1 account');
+      }
+      console.time('calling zkApp');
       zkApp.RegisterToVote(voter1, voter1Secret);
+      console.timeLog('calling zkApp');
     });
+    console.time('proving transaction');
     await txn.prove();
+    console.timeLog('proving transaction');
+    console.time('sending transaction');
     await txn.send();
-    console.log(txn.toPretty());
+    console.timeLog('sending transaction');
+    console.timeLog('RegisterToVote');
+    //console.log(txn.toPretty());
     //let voter1Account = getAccount(voter1, zkApp.getTokenID());
     //expect(voter1Account.balance).toEqual(1);
   });
 
   it('fails to re-mint another token for the same public key on the smart contract', async () => {
     const txn = await Mina.transaction(deployerAccount, () => {
+      //AccountUpdate.fundNewAccount(deployerAccount);
+      if (Account(voter1).isNew.get()) {
+        AccountUpdate.fundNewAccount(deployerAccount);
+      }
       zkApp.RegisterToVote(voter1, voter1Secret);
     });
     await txn.prove();
@@ -88,8 +107,10 @@ describe('RegisterToVote', () => {
 
   it('creates another voter successfully', async () => {
     const txn = await Mina.transaction(deployerAccount, () => {
-      AccountUpdate.fundNewAccount(deployerAccount);
-      AccountUpdate.fundNewAccount(deployerAccount);
+      //AccountUpdate.fundNewAccount(deployerAccount);
+      if (Account(voter1).isNew.get()) {
+        AccountUpdate.fundNewAccount(deployerAccount);
+      }
       zkApp.RegisterToVote(voter2, voter2Secret);
     });
     await txn.prove();
